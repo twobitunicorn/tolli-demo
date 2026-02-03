@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg width="54" height="54" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+
+  :root {
+    --logo-top-bar: #e8944b;
+    --logo-middle-bar: #6fc5e8;
+    --logo-bottom-bar: #fcdc53;
+    --logo-wordmark: #2a3140;
+  }
+
+  @media (prefers-color-scheme: dark) {
+  :root {
+    --logo-top-bar: #e8944b;
+    --logo-middle-bar: #6fc5e8;
+    --logo-bottom-bar: #fcdc53;
+    --logo-wordmark: #fff;
+  }
+}
+  </style>
+
+  <path id="top-bar" style="fill: var(--logo-top-bar)" d="M 24 0 H 54 V 16 H 24 A 8 8 0 0 1 16 8 V 8 A 8 8 0 0 1 24 0 Z"/>
+  <path id="middle-bar" style="fill: var(--logo-middle-bar)" d="M 24 38 H 54 V 54 H 24 A 8 8 0 0 1 16 46 V 46 A 8 8 0 0 1 24 38 Z"/>
+  <path id="bottom-bar" style="fill: var(--logo-bottom-bar)" d="M 32 19 H 54 V 35 H 32 A 8 8 0 0 1 24 27 V 27 A 8 8 0 0 1 32 19 Z"/>
+</svg>

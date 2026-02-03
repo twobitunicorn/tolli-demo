@@ -37,41 +37,58 @@ def get_contributors_data() -> pl.DataFrame:
     with s3.open(f"{BUCKET_NAME}/tolli/contributor_frame.ipc", "rb") as f:
         return pl.read_ipc_stream(f)
 
+st.markdown("""
+<style>
+    /* Target the specific div that wraps the image and remove border-radius */
+    .st-emotion-cache-1dp5vir { /* This class name is specific to Streamlit's internal structure and might change with updates */
+        border-radius: 0px !important;
+    }
+    /* A more generic approach that may work across versions: */
+    /* Target the image element within the main block container */
+    .block-container img {
+        border-radius: 0px !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-st.set_page_config(layout="wide")
 
-try:
-    col_buffer_left, col_content, col_buffer_right = st.columns([1, 10, 1])
-    with col_content:
-        team_frame = get_teams_data()
-        title = st.title("Tolli.ai Demo (v.0.0.11)")
-        _teams = {_team["slug"]: _team for _team in team_frame.rows(named=True)}
-        teams = st.multiselect(
-            label="Choose teams",
-            options=list(_teams.keys()),
-            default=list(_teams.keys()),
-            format_func=lambda x: _teams[x]["name"],
-        )
-        if not teams:
-            st.error("Please select at least one team.")
-        else:
-            for team in teams:
-                col1, col2, _ = st.columns([1, 1, 10])
-                with col1:
-                    st.image(_teams[team]["avatar_url"], width=68)
-                with col2:
-                    st.subheader(_teams[team]["name"])
+st.set_page_config(page_title="Tolli.ai", page_icon="favicon.svg", layout="wide")
 
-                for contributor in (
-                    get_contributors_data()
-                    .filter(pl.col("current_team_slug") == team)
-                    .rows(named=True)
-                ):
-                    buf, col1, col2 = st.columns([1, 1, 10])
-                    with col1:
-                        st.image(contributor["avatar_url"], width=68)
-                    with col2:
-                        st.subheader(contributor["display_name"])
+col_buffer_left, col_content, col_buffer_right = st.columns([1, 10, 1])
+
+
+team_frame = get_teams_data()
+contributors_frame = get_contributors_data()
+
+with col_content:
+    st.image("logoLight.svg")
+    title = st.title("Demo (v.0.0.11)")
+    _teams = {_team["slug"]: _team for _team in team_frame.rows(named=True)}
+    teams = st.multiselect(
+        label="Choose teams",
+        options=list(_teams.keys()),
+        default=list(_teams.keys()),
+        format_func=lambda x: _teams[x]["name"],
+    )
+    if not teams:
+        st.error("Please select at least one team.")
+    else:
+        for team in teams:
+            with st.container(horizontal=True):
+                st.image(_teams[team]["avatar_url"], width=68)
+                st.space("xxsmall")
+                st.subheader(_teams[team]["name"])
+
+            # for contributor in (
+            #     get_contributors_data()
+            #     .filter(pl.col("current_team_slug") == team)
+            #     .rows(named=True)
+            # ):
+            #     buf, col1, col2 = st.columns([1, 1, 10])
+            #     with col1:
+            #         st.image(contributor["avatar_url"], width=68)
+            #     with col2:
+            #         st.subheader(contributor["display_name"])
 
         # data: Unknown = df.loc[countries]
         # data /= 1000000.0
@@ -92,5 +109,3 @@ try:
         #     )
         # )
         # st.altair_chart(chart, use_container_width=True)
-except URLError as e:
-    st.error(f"This demo requires internet access. Connection error: {e.reason}")
