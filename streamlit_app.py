@@ -68,12 +68,15 @@ def get_normalized_distances_data(
         return pl.read_ipc_stream(f)
     
 @st.cache_data
-def get_normalized_distances_data_full(
-    org: str | None = "tolli-inc",
-    team: str | None = None,
-) -> pl.DataFrame:
+def get_normalized_distances_data_full() -> pl.DataFrame:
     with s3.open(f"{BUCKET_NAME}/normalized_distances_frame.ipc", "rb") as f:
         return pl.read_ipc_stream(f)
+
+@st.cache_data
+def get_label_distances_data() -> pl.DataFrame:
+    with s3.open(f"{BUCKET_NAME}/label_distance_frame.ipc", "rb") as f:
+        return pl.read_ipc_stream(f)
+
 
 
 @st.cache_data
@@ -214,8 +217,8 @@ with col_content:
 
     with st.container():
         with st.expander("Debug Info"):
-            trend_tab, variance_tab, cluster_tab = st.tabs(
-                ["Trend", "Variance", "Clustering"]
+            trend_tab, variance_tab = st.tabs(
+                ["Trend", "Variance"]
             )
             with trend_tab:
                 # if debug_info:
@@ -243,19 +246,6 @@ with col_content:
                     )
                     .mark_line().encode(x="date:T", y="value:Q", color="variable:N")
                 )
-
-            with cluster_tab:
-                polar_bars = alt.Chart(get_labels_count_data()).mark_arc(stroke='white', tooltip=True).encode(
-                    theta=alt.Theta("label", type="nominal"),
-                    radius=alt.Radius('len').scale(type='linear'),
-                    radius2=alt.datum(1),
-                    color=alt.Color(field="label", type="nominal", legend=None),
-                )
-                layer = alt.layer(
-                    polar_bars,
-                    # title=['Current classification of contributors', '']
-                )
-                st.altair_chart(layer)
 
     with st.container():
         st.header("Clustering")
@@ -320,8 +310,8 @@ with col_content:
 
                                 
                     with st.expander("Debug Info"):
-                        trend_tab, variance_tab, cluster_tab = st.tabs(
-                            ["Trend", "Variance", "Clustering"]
+                        trend_tab, variance_tab = st.tabs(
+                            ["Trend", "Variance"]
                         )
                         with trend_tab:
                             st.altair_chart(
@@ -344,18 +334,27 @@ with col_content:
                                     )
                                 ).mark_line().encode(x="date:T", y="value:Q", color="variable:N")
                             )
-                        with cluster_tab:
-                            polar_bars = alt.Chart(get_labels_count_data(team=team)).mark_arc(stroke='white', tooltip=True).encode(
-                                theta=alt.Theta("label", type="nominal"),
-                                radius=alt.Radius('len').scale(type='linear'),
-                                radius2=alt.datum(1),
-                                color=alt.Color(field="label", type="nominal", legend=None),
-                            )
-                            layer = alt.layer(
-                                polar_bars,
-                                # title=['Current classification of contributors', '']
-                            )
-                            st.altair_chart(layer)
+                        # with cluster_tab:
+                        #     st.altair_chart(
+                        #         alt.Chart(
+                        #             get_label_distances_data()
+                        #             .unpivot(
+                        #                 cs.numeric(),
+                        #                 index=["label"]
+                        #             )
+                        #         ).mark_line().encode(x="date:T", y="value:Q", color="variable:N")
+                        #     )
+                            # polar_bars = alt.Chart(get_labels_count_data(team=team)).mark_arc(stroke='white', tooltip=True).encode(
+                            #     theta=alt.Theta("label", type="nominal"),
+                            #     radius=alt.Radius('len').scale(type='linear'),
+                            #     radius2=alt.datum(1),
+                            #     color=alt.Color(field="label", type="nominal", legend=None),
+                            # )
+                            # layer = alt.layer(
+                            #     polar_bars,
+                            #     # title=['Current classification of contributors', '']
+                            # )
+                            # st.altair_chart(layer)
 
             # for contributor in (
             #     get_contributors_data()
