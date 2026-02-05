@@ -6,8 +6,6 @@ import streamlit as st
 from dotenv import load_dotenv
 import polars.selectors as cs
 
-import streamlit as st
-        
 AWS_ACCESS_KEY_ID = "tid_xpRCdsbJTvJoNOJzygerAAVUDPlKVvGwGOCLwyuPvsZUnBnrEC"
 AWS_SECRET_ACCESS_KEY = (
     "tsec_lxcWdBpInYBlBfNw+kz7ySYDm+u+AsJW3eVGypI7Q3BUeyX8RfPPg2vFHO5jzI89XrvXJb"
@@ -44,26 +42,66 @@ aggs: list[pl.Expr] = [
 
 
 @st.cache_data
-def get_teams_data() -> pl.DataFrame:
-    with s3.open(f"{BUCKET_NAME}/tolli/team_frame.ipc", "rb") as f:
+def get_teams_data(
+    org: str | None = "tolli-inc",
+    team: str | None = None,
+) -> pl.DataFrame:
+    if team is None:
+        with s3.open(f"{BUCKET_NAME}/{org}/team_frame.ipc", "rb") as f:
+            return pl.read_ipc_stream(f)
+    with s3.open(f"{BUCKET_NAME}/{org}/team/{team}team_frame.ipc", "rb") as f:
         return pl.read_ipc_stream(f)
 
 
 @st.cache_data
-def get_contributors_data() -> pl.DataFrame:
-    with s3.open(f"{BUCKET_NAME}/tolli/contributor_frame.ipc", "rb") as f:
+def get_contributors_data(
+    org: str | None = "tolli-inc",
+    team: str | None = None,
+) -> pl.DataFrame:
+    if team is None:
+        with s3.open(f"{BUCKET_NAME}/{org}/contributor_frame.ipc", "rb") as f:
+            return pl.read_ipc_stream(f)
+    with s3.open(f"{BUCKET_NAME}/{org}/team/{team}/contributor_frame.ipc", "rb") as f:
         return pl.read_ipc_stream(f)
 
 
 @st.cache_data
-def get_trends_data() -> pl.DataFrame:
-    with s3.open(f"{BUCKET_NAME}/tolli/trend_frame.ipc", "rb") as f:
-        return pl.read_ipc_stream(f)
+def get_trends_data(
+    org: str = "tolli-inc",
+    team: str | None = None,
+    contributor: str | None = None,
+) -> pl.DataFrame:
+    if contributor is None and team is None:
+        with s3.open(f"{BUCKET_NAME}/{org}/trend_frame.ipc", "rb") as f:
+            return pl.read_ipc_stream(f)
+    elif team is None:
+        with s3.open(f"{BUCKET_NAME}/{org}/contributor/{contributor}/trend_frame.ipc", "rb") as f:
+            return pl.read_ipc_stream(f)
+    elif contributor is None:
+        with s3.open(f"{BUCKET_NAME}/{org}/team/{team}/trend_frame.ipc", "rb") as f:
+            return pl.read_ipc_stream(f)
+    raise Exception("invalid code point")
+
 
 @st.cache_data
-def get_variances_data() -> pl.DataFrame:
-    with s3.open(f"{BUCKET_NAME}/tolli/variance_frame.ipc", "rb") as f:
-        return pl.read_ipc_stream(f)
+def get_variances_data(
+    org: str = "tolli-inc",
+    team: str | None = None,
+    contributor: str | None = None,
+) -> pl.DataFrame:
+    if contributor is None and team is None:
+        with s3.open(f"{BUCKET_NAME}/{org}/variance_frame.ipc", "rb") as f:
+            return pl.read_ipc_stream(f)
+    elif team is None:
+        with s3.open(
+            f"{BUCKET_NAME}/{org}/contributor/{contributor}/variance_frame.ipc", "rb"
+        ) as f:
+            return pl.read_ipc_stream(f)
+    elif contributor is None:
+        with s3.open(f"{BUCKET_NAME}/{org}/team/{team}/variance_frame.ipc", "rb") as f:
+            return pl.read_ipc_stream(f)
+    raise Exception("invalid code point")
+
 
 st.markdown(
     """
@@ -90,24 +128,25 @@ col_buffer_left, col_content, col_buffer_right = st.columns([1, 10, 1])
 
 team_frame = get_teams_data()
 contributor_frame = get_contributors_data()
-trend_frame = get_trends_data()
-org_trend_frame = trend_frame.sort("org_login", "date").group_by_dynamic(
-    "date", every="1d", start_by="monday", group_by=["org_login"]
-).agg(aggs)
+# trend_frame = get_trends_data()
+# org_trend_frame = trend_frame.sort("org_login", "date").group_by_dynamic(
+#     "date", every="1d", start_by="monday", group_by=["org_login"]
+# ).agg(aggs)
 
-team_trend_frame = trend_frame.sort("org_login", "date").group_by_dynamic(
-    "date", every="1d", start_by="monday", group_by=["org_login", "team_slug"]
-).agg(aggs)
+# team_trend_frame = trend_frame.sort("org_login", "date").group_by_dynamic(
+#     "date", every="1d", start_by="monday", group_by=["org_login", "team_slug"]
+# ).agg(aggs)
 
-variance_frame = get_variances_data()
-org_variance_frame = variance_frame.sort("org_login", "date").group_by_dynamic(
-    "date", every="1d", start_by="monday", group_by=["org_login"]
-).agg(aggs)
+# variance_frame = get_variances_data()
+# org_variance_frame = variance_frame.sort("org_login", "date").group_by_dynamic(
+#     "date", every="1d", start_by="monday", group_by=["org_login"]
+# ).agg(aggs)
 
-team_variance_frame = variance_frame.sort("org_login", "date").group_by_dynamic(
-    "date", every="1d", start_by="monday", group_by=["org_login", "team_slug"]
-).agg(aggs)
+# team_variance_frame = variance_frame.sort("org_login", "date").group_by_dynamic(
+#     "date", every="1d", start_by="monday", group_by=["org_login", "team_slug"]
+# ).agg(aggs)
 
+org_login = "tolli-inc"
 with col_content:
     st.image("logoLight.svg")
     st.title("Demo (v.0.0.11)")
@@ -121,11 +160,23 @@ with col_content:
             )
             with trend_tab:
                 st.altair_chart(
-                    org_trend_frame.filter(pl.col("org_login") == "tolli-inc").unpivot(cs.numeric(), index=["org_login", "date"], variable_name="data_point", value_name="value").plot.line(x="date:T", y="value:Q", color="data_point:N")
+                    get_trends_data()
+                    .filter(pl.col("org_login") == org_login)
+                    .unpivot(
+                        cs.numeric(),
+                        index=["org_login", "date"]
+                    )
+                    .plot.line(x="date:T", y="value:Q", color="variable:N")
                 )
             with variance_tab:
                 st.altair_chart(
-                    org_variance_frame.filter(pl.col("org_login") == "tolli-inc").unpivot(cs.numeric(), index=["org_login", "date"], variable_name="data_point", value_name="value").plot.line(x="date:T", y="value:Q", color="data_point:N")
+                    get_variances_data()
+                    .filter(pl.col("org_login") == org_login)
+                    .unpivot(
+                        cs.numeric(),
+                        index=["org_login", "date"]
+                    )
+                    .plot.line(x="date:T", y="value:Q", color="variable:N")
                 )
 
     with st.container():
@@ -134,7 +185,7 @@ with col_content:
             "This is where we show the attributes of each team and engineer.  The tabs give some debug insight."
         )
 
-        _teams = {_team["slug"]: _team for _team in team_frame.rows(named=True)}
+        _teams = {_team["slug"]: _team for _team in get_teams_data().rows(named=True)}
 
         teams = st.multiselect(
             label="Choose teams",
@@ -151,11 +202,9 @@ with col_content:
                         st.image(_teams[team]["avatar_url"], width=68)
                         st.space("xxsmall")
                         st.subheader(_teams[team]["name"])
-                    
+
                     with st.expander("Contributors"):
-                        for contributor in contributor_frame.filter(
-                            pl.col("current_team_slug") == team
-                        ).rows(named=True):
+                        for contributor in get_contributors_data(team=team).rows(named=True):
                             with st.container(horizontal=True):
                                 st.space("xsmall")
                                 st.image(contributor["avatar_url"], width=42)
@@ -169,11 +218,25 @@ with col_content:
                         )
                         with trend_tab:
                             st.altair_chart(
-                                team_trend_frame.filter((pl.col("org_login") == "tolli-inc") & (pl.col("team_slug") == team)).unpivot(cs.numeric(), index=["org_login", "date"], variable_name="data_point", value_name="value").plot.line(x="date:T", y="value:Q", color="data_point:N")
+                                get_trends_data(team=team)
+                                .unpivot(
+                                    cs.numeric(),
+                                    index=["org_login", "date"],
+                                )
+                                .plot.line(
+                                    x="date:T", y="value:Q", color="variable:N"
+                                )
                             )
                         with variance_tab:
                             st.altair_chart(
-                                team_variance_frame.filter((pl.col("org_login") == "tolli-inc") & (pl.col("team_slug") == team)).unpivot(cs.numeric(), index=["org_login", "date"], variable_name="data_point", value_name="value").plot.line(x="date:T", y="value:Q", color="data_point:N")
+                                get_variances_data(team=team)
+                                .unpivot(
+                                    cs.numeric(),
+                                    index=["org_login", "team_slug", "date"],
+                                )
+                                .plot.line(
+                                    x="date:T", y="value:Q", color="variable:N"
+                                )
                             )
 
             # for contributor in (
@@ -214,7 +277,7 @@ with col_content:
 
         _contributors = {
             _contributor["login"]: _contributor
-            for _contributor in contributor_frame.rows(named=True)
+            for _contributor in get_contributors_data().rows(named=True)
         }
         contributors = st.multiselect(
             label="Choose contributors",
