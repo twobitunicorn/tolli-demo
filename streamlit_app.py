@@ -5,6 +5,67 @@ import s3fs
 import streamlit as st
 from dotenv import load_dotenv
 import polars.selectors as cs
+import math
+import altair as alt
+import pandas as pd
+
+source = pd.DataFrame({
+    "hour": range(24),
+    "observations": [2, 2, 2, 2, 2, 3, 4, 4, 8, 8, 9, 7, 5, 6, 8, 8, 7, 7, 4, 3, 3, 2, 2, 2]
+})
+
+polar_bars = alt.Chart(source).mark_arc(stroke='white', tooltip=True).encode(
+    theta=alt.Theta("hour:O"),
+    radius=alt.Radius('observations').scale(type='linear'),
+    radius2=alt.datum(1),
+)
+
+# Create the circular axis lines for the number of observations
+axis_rings = alt.Chart(pd.DataFrame({"ring": range(2, 11, 2)})).mark_arc(stroke='lightgrey', fill=None).encode(
+    theta=alt.value(2 * math.pi),
+    radius=alt.Radius('ring').stack(False)
+)
+axis_rings_labels = axis_rings.mark_text(color='grey', radiusOffset=5, align='left').encode(
+    text="ring",
+    theta=alt.value(math.pi / 4)
+)
+
+# Create the straight axis lines for the time of the day
+axis_lines = alt.Chart(pd.DataFrame({
+    "radius": 10,
+    "theta": math.pi / 2,
+    'hour': ['00:00', '06:00', '12:00', '18:00']
+})).mark_arc(stroke='lightgrey', fill=None).encode(
+    theta=alt.Theta('theta').stack(True),
+    radius=alt.Radius('radius'),
+    radius2=alt.datum(1),
+)
+axis_lines_labels = axis_lines.mark_text(
+        color='grey',
+        radiusOffset=5,
+        thetaOffset=-math.pi / 4,
+        # These adjustments could be left out with a larger radius offset, but they make the label positioning a bit cleaner
+        align=alt.expr('datum.hour == "18:00" ? "right" : datum.hour == "06:00" ? "left" : "center"'),
+        baseline=alt.expr('datum.hour == "00:00" ? "bottom" : datum.hour == "12:00" ? "top" : "middle"'),
+    ).encode(text="hour")
+
+alt.layer(
+    axis_rings,
+    polar_bars,
+    axis_rings_labels,
+    axis_lines,
+    axis_lines_labels,
+    title=['Observations throughout the day', '']
+)
+bar_source = pd.DataFrame({
+    'a': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'],
+    'b': [28, 55, 43, 91, 81, 53, 19, 87, 52]
+})
+
+bars = alt.Chart(bar_source).mark_bar().encode(
+    x='a',
+    y='b'
+)
 
 AWS_ACCESS_KEY_ID = "tid_xpRCdsbJTvJoNOJzygerAAVUDPlKVvGwGOCLwyuPvsZUnBnrEC"
 AWS_SECRET_ACCESS_KEY = (
@@ -55,6 +116,29 @@ def get_teams_data(
 
 @st.cache_data
 def get_contributors_data(
+    org: str | None = "tolli-inc",
+    team: str | None = None,
+) -> pl.DataFrame:
+    if team is None:
+        with s3.open(f"{BUCKET_NAME}/{org}/contributor_frame.ipc", "rb") as f:
+            return pl.read_ipc_stream(f)
+    with s3.open(f"{BUCKET_NAME}/{org}/team/{team}/contributor_frame.ipc", "rb") as f:
+        return pl.read_ipc_stream(f)
+
+@st.cache_data
+def get_label(
+    org: str | None = "tolli-inc",
+    team: str | None = None,
+    contributor: str | None = None
+) -> pl.DataFrame:
+    if team is None:
+        with s3.open(f"{BUCKET_NAME}/{org}/contributor_frame.ipc", "rb") as f:
+            return pl.read_ipc_stream(f)
+    with s3.open(f"{BUCKET_NAME}/{org}/team/{team}/contributor_frame.ipc", "rb") as f:
+        return pl.read_ipc_stream(f)
+
+@st.cache_data
+def get_labels_data(
     org: str | None = "tolli-inc",
     team: str | None = None,
 ) -> pl.DataFrame:
@@ -125,34 +209,19 @@ st.set_page_config(page_title="Tolli.ai", page_icon="favicon.svg", layout="wide"
 
 col_buffer_left, col_content, col_buffer_right = st.columns([1, 10, 1])
 
-
-team_frame = get_teams_data()
-contributor_frame = get_contributors_data()
-# trend_frame = get_trends_data()
-# org_trend_frame = trend_frame.sort("org_login", "date").group_by_dynamic(
-#     "date", every="1d", start_by="monday", group_by=["org_login"]
-# ).agg(aggs)
-
-# team_trend_frame = trend_frame.sort("org_login", "date").group_by_dynamic(
-#     "date", every="1d", start_by="monday", group_by=["org_login", "team_slug"]
-# ).agg(aggs)
-
-# variance_frame = get_variances_data()
-# org_variance_frame = variance_frame.sort("org_login", "date").group_by_dynamic(
-#     "date", every="1d", start_by="monday", group_by=["org_login"]
-# ).agg(aggs)
-
-# team_variance_frame = variance_frame.sort("org_login", "date").group_by_dynamic(
-#     "date", every="1d", start_by="monday", group_by=["org_login", "team_slug"]
-# ).agg(aggs)
-
 org_login = "tolli-inc"
+org_label = 3
+
 with col_content:
     st.image("logoLight.svg")
     st.title("Demo (v.0.0.11)")
     st.text(
         "This is an industry overview as processed from various organizations.  All information is public.  This model is still in development and result should not be taken as fact."
     )
+    with st.container(horizontal=True):
+        st.altair_chart(polar_bars)
+        # st.altair_chart(polar_bars)
+        # st.altair_chart(alt.Chart(pl.DataFrame({"label": ["0", "1", "2"], "count": [3, 4, 7]})).mark_bar().encode(x="label", y="count"))
     with st.container():
         with st.expander("Debug Info"):
             trend_tab, variance_tab, cluster_tab = st.tabs(
@@ -160,23 +229,27 @@ with col_content:
             )
             with trend_tab:
                 st.altair_chart(
-                    get_trends_data()
-                    .filter(pl.col("org_login") == org_login)
-                    .unpivot(
-                        cs.numeric(),
-                        index=["org_login", "date"]
+                    alt.Chart(
+                        get_trends_data()
+                        .filter(pl.col("org_login") == org_login)
+                        .unpivot(
+                            cs.numeric(),
+                            index=["org_login", "date"]
+                        )
                     )
-                    .plot.line(x="date:T", y="value:Q", color="variable:N")
+                    .mark_line().encode(x="date:T", y="value:Q", color="variable:N")
                 )
             with variance_tab:
                 st.altair_chart(
-                    get_variances_data()
-                    .filter(pl.col("org_login") == org_login)
-                    .unpivot(
-                        cs.numeric(),
-                        index=["org_login", "date"]
+                    alt.Chart(
+                        get_variances_data()
+                        .filter(pl.col("org_login") == org_login)
+                        .unpivot(
+                            cs.numeric(),
+                            index=["org_login", "date"]
+                        )
                     )
-                    .plot.line(x="date:T", y="value:Q", color="variable:N")
+                    .mark_line().encode(x="date:T", y="value:Q", color="variable:N")
                 )
 
     with st.container():
@@ -212,6 +285,7 @@ with col_content:
                                 st.text(
                                     contributor["display_name"] or contributor["login"]
                                 )
+                                
                     with st.expander("Debug Info"):
                         trend_tab, variance_tab, cluster_tab = st.tabs(
                             ["Trend", "Variance", "Clustering"]
