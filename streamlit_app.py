@@ -147,7 +147,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
 st.set_page_config(page_title="Tolli.ai", page_icon="favicon.svg", layout="wide")
 
 col_buffer_left, col_content, col_buffer_right = st.columns([1, 10, 1])
@@ -164,21 +163,27 @@ with col_content:
     # debug_info = st.toggle("Include supporting text.")
 
     with st.container(horizontal=True):
-        polar_bars = alt.Chart(get_labels_count_data()).mark_arc(stroke='white', tooltip=True).encode(
+        org_label_count = get_labels_count_data()
+        max_count = get_labels_count_data()["len"].max()
+        polar_bars = alt.Chart(org_label_count).mark_arc(stroke='white', tooltip=True).encode(
             theta=alt.Theta("label", type="nominal"),
             radius=alt.Radius('len').scale(type='linear'),
-            radius2=alt.datum(1),
+            radius2=alt.datum(max_count * 0.08),
             color=alt.Color(field="label", type="nominal", legend=None),
         )
+        # Create the circular axis lines for the number of observations
+        # axis_rings = alt.Chart(pd.DataFrame({"ring": range(int(max_count * 0.08), max_count, 40)})).mark_arc(stroke='lightgrey', fill=None).encode(
+        #     theta=alt.value(2 * math.pi),
+        #     radius=alt.Radius('ring').stack(False)
+        # )
+
         layer = alt.layer(
+            # axis_rings,
             polar_bars,
             # title=['Current classification of contributors', '']
         )
         st.altair_chart(layer)
 
-    #     st.text("hi")
-        # st.altair_chart(polar_bars)
-        # st.altair_chart(alt.Chart(pl.DataFrame({"label": ["0", "1", "2"], "count": [3, 4, 7]})).mark_bar().encode(x="label", y="count"))
     with st.container():
         with st.expander("Debug Info"):
             trend_tab, variance_tab, cluster_tab = st.tabs(
@@ -247,6 +252,8 @@ with col_content:
                         st.image(_teams[team]["avatar_url"], width=68)
                         st.space("xxsmall")
                         st.subheader(_teams[team]["name"])
+                        st.space("xxsmall")
+                        st.badge(_teams[team]["label"], help="The current classification of the team.")
                     with st.container(horizontal=True):
                         polar_bars = alt.Chart(get_labels_count_data(team=team)).mark_arc(stroke='white', tooltip=True).encode(
                             theta=alt.Theta("label", type="nominal"),
@@ -270,6 +277,9 @@ with col_content:
                                 st.text(
                                     contributor["display_name"] or contributor["login"]
                                 )
+                                st.space("xxsmall")
+                                st.badge(contributor["label"], help="The current classification of the user.")
+
                                 
                     with st.expander("Debug Info"):
                         trend_tab, variance_tab, cluster_tab = st.tabs(
