@@ -55,6 +55,25 @@ def get_teams_data(
             return pl.read_ipc_stream(f)
     with s3.open(f"{BUCKET_NAME}/{org}/team/{team}team_frame.ipc", "rb") as f:
         return pl.read_ipc_stream(f)
+    
+@st.cache_data
+def get_normalized_distances_data(
+    org: str | None = "tolli-inc",
+    team: str | None = None,
+) -> pl.DataFrame:
+    if team is None:
+        with s3.open(f"{BUCKET_NAME}/{org}/normalized_distances_frame.ipc", "rb") as f:
+            return pl.read_ipc_stream(f)
+    with s3.open(f"{BUCKET_NAME}/{org}/team/{team}/normalized_distances_frame.ipc", "rb") as f:
+        return pl.read_ipc_stream(f)
+    
+@st.cache_data
+def get_normalized_distances_data_full(
+    org: str | None = "tolli-inc",
+    team: str | None = None,
+) -> pl.DataFrame:
+    with s3.open(f"{BUCKET_NAME}/normalized_distances_frame.ipc", "rb") as f:
+        return pl.read_ipc_stream(f)
 
 
 @st.cache_data
@@ -162,7 +181,16 @@ with col_content:
     )
     # debug_info = st.toggle("Include supporting text.")
 
-    with st.container(horizontal=True):
+    with st.container(horizontal=True, vertical_alignment="center"):
+        st.altair_chart(alt.Chart(get_normalized_distances_data().with_columns(
+                (100*(1-pl.col("distance"))**2).alias("strength"))
+            ).mark_circle().encode(
+                x=alt.X('date:O', axis=alt.Axis(labels=False)),
+                y=alt.Y('label:O'),
+                size=alt.Color('strength:Q', legend=None),
+            ),
+            width="content",
+        )
         org_label_count = get_labels_count_data()
         max_count = get_labels_count_data()["len"].max()
         polar_bars = alt.Chart(org_label_count).mark_arc(stroke='white', tooltip=True).encode(
@@ -248,13 +276,23 @@ with col_content:
         else:
             for team in teams:
                 with st.container():
-                    with st.container(horizontal=True):
+                    with st.container(horizontal=True, vertical_alignment="center"):
                         st.image(_teams[team]["avatar_url"], width=68)
                         st.space("xxsmall")
                         st.subheader(_teams[team]["name"])
                         st.space("xxsmall")
                         st.badge(_teams[team]["label"], help="The current classification of the team.")
                     with st.container(horizontal=True):
+                        st.altair_chart(alt.Chart(get_normalized_distances_data(team=team).with_columns(
+                                (100*(1-pl.col("distance"))**2).alias("strength"))
+                            ).mark_circle().encode(
+                                x=alt.X('date:O', axis=alt.Axis(labels=False)),
+                                y=alt.Y('label:O'),
+                                size=alt.Color('strength:Q', legend=None),
+                            ),
+                            width="content",
+                        )
+
                         polar_bars = alt.Chart(get_labels_count_data(team=team)).mark_arc(stroke='white', tooltip=True).encode(
                             theta=alt.Theta("label", type="nominal"),
                             radius=alt.Radius('len').scale(type='linear'),
@@ -385,7 +423,19 @@ with col_content:
             st.error("Please select at least one contributors.")
         else:
             with st.container():
-                with st.container(horizontal=True):
+                with st.container(horizontal=True, vertical_alignment="center"):
+                    selected_distance_frame = get_normalized_distances_data_full().filter(pl.col("user_login").is_in(contributors)).group_by("org_login", "user_login", "label", "date").agg(cs.numeric().mean())
+                    st.altair_chart(alt.Chart(selected_distance_frame.with_columns(
+                            (100*(1-pl.col("distance"))**2).alias("strength"))
+                        ).mark_circle().encode(
+                            x=alt.X('date:O', axis=alt.Axis(labels=False)),
+                            y=alt.Y('label:O'),
+                            size=alt.Color('strength:Q', legend=None),
+                        ),
+                        width="content",
+                    )
+
+
                     selected_contributors = get_contributors_data().filter(pl.col("login").is_in(contributors))
                     polar_bars = alt.Chart(selected_contributors.group_by("label").agg(pl.len())).mark_arc(stroke='white', tooltip=True).encode(
                         theta=alt.Theta("label", type="nominal"),
