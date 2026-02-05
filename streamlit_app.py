@@ -174,7 +174,7 @@ st.set_page_config(page_title="Tolli.ai", page_icon="favicon.svg", layout="wide"
 col_buffer_left, col_content, col_buffer_right = st.columns([1, 10, 1])
 
 org_login = "tolli-inc"
-org_label = 3
+org_label = "3"
 
 with col_content:
     st.image("logoLight.svg")
@@ -217,8 +217,8 @@ with col_content:
 
     with st.container():
         with st.expander("Debug Info"):
-            trend_tab, variance_tab = st.tabs(
-                ["Trend", "Variance"]
+            trend_tab, variance_tab, cluster_tab = st.tabs(
+                ["Trend", "Variance", "Clustering"]
             )
             with trend_tab:
                 # if debug_info:
@@ -246,6 +246,19 @@ with col_content:
                     )
                     .mark_line().encode(x="date:T", y="value:Q", color="variable:N")
                 )
+
+            with cluster_tab:
+                with cluster_tab:
+                    st.altair_chart(
+                        alt.Chart(
+                            get_label_distances_data().filter(
+                                pl.col("label") == org_label
+                            ).unpivot(
+                                (cs.numeric()-cs.by_name("index")),
+                                index=["label", "index"]
+                            )
+                        ).mark_line().encode(x="index:T", y="value:Q", color="variable:N")
+                    )
 
     with st.container():
         st.header("Clustering")
@@ -310,8 +323,8 @@ with col_content:
 
                                 
                     with st.expander("Debug Info"):
-                        trend_tab, variance_tab = st.tabs(
-                            ["Trend", "Variance"]
+                        trend_tab, variance_tab, cluster_tab = st.tabs(
+                            ["Trend", "Variance", "Clustering"]
                         )
                         with trend_tab:
                             st.altair_chart(
@@ -334,27 +347,17 @@ with col_content:
                                     )
                                 ).mark_line().encode(x="date:T", y="value:Q", color="variable:N")
                             )
-                        # with cluster_tab:
-                        #     st.altair_chart(
-                        #         alt.Chart(
-                        #             get_label_distances_data()
-                        #             .unpivot(
-                        #                 cs.numeric(),
-                        #                 index=["label"]
-                        #             )
-                        #         ).mark_line().encode(x="date:T", y="value:Q", color="variable:N")
-                        #     )
-                            # polar_bars = alt.Chart(get_labels_count_data(team=team)).mark_arc(stroke='white', tooltip=True).encode(
-                            #     theta=alt.Theta("label", type="nominal"),
-                            #     radius=alt.Radius('len').scale(type='linear'),
-                            #     radius2=alt.datum(1),
-                            #     color=alt.Color(field="label", type="nominal", legend=None),
-                            # )
-                            # layer = alt.layer(
-                            #     polar_bars,
-                            #     # title=['Current classification of contributors', '']
-                            # )
-                            # st.altair_chart(layer)
+                        with cluster_tab:
+                            st.altair_chart(
+                                alt.Chart(
+                                    get_label_distances_data().filter(
+                                        pl.col("label") == _teams[team]["label"]
+                                    ).unpivot(
+                                        (cs.numeric()-cs.by_name("index")),
+                                        index=["label", "index"]
+                                    )
+                                ).mark_line().encode(x="index:T", y="value:Q", color="variable:N")
+                            )
 
             # for contributor in (
             #     get_contributors_data()
