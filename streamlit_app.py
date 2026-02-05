@@ -362,7 +362,7 @@ with col_content:
         contributors = st.multiselect(
             label="Choose contributors",
             options=list(_contributors.keys()),
-            default=random.sample(list(_contributors.keys()), 7),
+            default=[],
             format_func=lambda x: (
                 _contributors[x]["display_name"] or _contributors[x]["login"]
             ),
@@ -370,4 +370,23 @@ with col_content:
         if not contributors:
             st.error("Please select at least one contributors.")
         else:
-            pass
+            with st.container():
+                with st.container(horizontal=True):
+                    selected_contributors = get_contributors_data().filter(pl.col("login").is_in(contributors))
+                    polar_bars = alt.Chart(selected_contributors.group_by("label").agg(pl.len())).mark_arc(stroke='white', tooltip=True).encode(
+                        theta=alt.Theta("label", type="nominal"),
+                        radius=alt.Radius('len').scale(type='linear'),
+                        radius2=alt.datum(1),
+                        color=alt.Color(field="label", type="nominal", legend=None),
+                    )
+                    layer = alt.layer(
+                        alt.Chart(selected_contributors.group_by("label").agg(pl.len())).mark_arc(stroke='white', tooltip=True).encode(
+                            theta=alt.Theta("label", type="nominal"),
+                            radius=alt.Radius('len').scale(type='linear'),
+                            radius2=alt.datum(0),
+                            color=alt.Color(field="label", type="nominal", legend=None),
+                        ),
+                        # title=['Current classification of contributors', '']
+                    )
+                    st.altair_chart(layer)
+
