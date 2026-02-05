@@ -350,19 +350,33 @@ with col_content:
         # )
         # st.altair_chart(chart, use_container_width=True)
     with st.container():
+        _default_contributors = {
+            _contributor["login"]: _contributor
+            for _contributor in get_contributors_data().sample(n=12).rows(named=True)
+        }
+
         st.header("Team Construction")
-        st.text(
-            "This is where we show the attributes of each team and engineer.  The tabs give some debug insight."
-        )
+        with st.container(horizontal=True, horizontal_alignment="distribute", vertical_alignment="bottom"):
+            st.text(
+                "This is where we show the attributes of each team and engineer.  The tabs give some debug insight."
+            )
+            if st.button("Randomize"):
+                _default_contributors = {
+                    _contributor["login"]: _contributor
+                    for _contributor in get_contributors_data().sample(n=12).rows(named=True)
+                }
+
+
 
         _contributors = {
             _contributor["login"]: _contributor
             for _contributor in get_contributors_data().rows(named=True)
         }
+        
         contributors = st.multiselect(
             label="Choose contributors",
             options=list(_contributors.keys()),
-            default=[],
+            default=list(_default_contributors.keys()),
             format_func=lambda x: (
                 _contributors[x]["display_name"] or _contributors[x]["login"]
             ),
